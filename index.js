@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, openSync, closeSync, existsSync, appendFileSync, unlinkSync, mkdtempSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, openSync, closeSync, existsSync, appendFileSync, unlinkSync, mkdtempSync, rmSync, symlinkSync, lstatSync, readlinkSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import net from 'node:net';
 
@@ -24,8 +24,8 @@ const GATEWAY = (() => {
   if (host === '0.0.0.0' || host === '::' || host === '*') host = '127.0.0.1';
   return { host, port };
 })();
-const BASHRC = join(HOME, '.bashrc');
-const BASHRC_LINE = `export PATH="${BIN_DIR}:$PATH"`;
+// /usr/local/bin 本来就在 PATH 里，且不在 dsh-Go 引擎升级的替换清单中
+const LINK_PATH = process.env.MAGPIE_LINK_PATH || '/usr/local/bin/magpie';
 
 function log(message) {
   const line = `${new Date().toISOString()} [autostart] ${message}\n`;
@@ -190,16 +190,41 @@ async function runInstaller(useProxy) {
   }
 }
 
-// 确保 ~/.bashrc 里有 PATH 行
-function ensureBashrcPath() {
-  const check = run('grep', ['-qxF', BASHRC_LINE, BASHRC]);
-  if (check.ok) return true;
+// 让用户能直接在对话里敲 magpie。
+// DSH 的 bash 工具是 `bash -c`（非登录、非交互），不读 ~/.bashrc / /etc/profile.d，
+// 所以只能靠 PATH 里已有的 /usr/local/bin 做软链。
+function ensureCliOnPath() {
   try {
-    appendFileSync(BASHRC, `\n${BASHRC_LINE}\n`);
-    log(`已向 ${BASHRC} 追加 PATH`);
+    let info = null;
+    try {
+      info = lstatSync(LINK_PATH);
+    } catch {
+      // 还不存在
+    }
+    if (info) {
+      if (!info.isSymbolicLink()) {
+        log(`${LINK_PATH} 已存在且不是软链，保留原文件不动`);
+        return false;
+      }
+      let target = '';
+      try {
+        target = readlinkSync(LINK_PATH);
+      } catch {
+        // 读不到就按需重建
+      }
+      if (target === BIN) return true;
+      try {
+        unlinkSync(LINK_PATH);
+      } catch {
+        // 删不掉就让下面的 symlink 报错
+      }
+    }
+    mkdirSync(dirname(LINK_PATH), { recursive: true });
+    symlinkSync(BIN, LINK_PATH);
+    log(`已创建软链 ${LINK_PATH} -> ${BIN}`);
     return true;
   } catch (err) {
-    log(`写入 ${BASHRC} 失败: ${err && err.message ? err.message : String(err)}`);
+    log(`创建软链 ${LINK_PATH} 失败: ${err && err.message ? err.message : String(err)}`);
     return false;
   }
 }
@@ -258,8 +283,6 @@ async function ensureInstalled() {
       return false;
     }
 
-    ensureBashrcPath();
-
     if (magpieWorks()) {
       log('magpie 安装完成');
       return true;
@@ -303,6 +326,7 @@ export function apply(ctx) {
     (async () => {
       if (!magpieWorks() && !(await ensureInstalled())) return;
       if (disposed) return;
+      ensureCliOnPath();
       if (await gatewayHealthy()) {
         log(`网关已在运行（${GATEWAY.host}:${GATEWAY.port}）`);
         return;
