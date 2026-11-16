@@ -1,6 +1,6 @@
 {
   "name": "dsh-go-magpie",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Installs magpie inside DSH Go's built-in Ubuntu environment and keeps its gateway (or gateway plus web console) running, with a native settings panel.",
   "license": "MIT",
   "type": "module",
@@ -67,3 +67,4 @@
     }
   }
 }
+

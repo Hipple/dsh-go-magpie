@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createController, keyFromText, parseAddr, proxyEndpoint } from '../lib/core.js'
+import { STALE_LOCK_MS, createController, isLockStale, keyFromText, parseAddr, proxyEndpoint, splitLogChunk } from '../lib/core.js'
 
 function makeDeps(logText = '') {
   const spawned = []
@@ -168,4 +168,41 @@ test('日志文件在构造时清空，面板只显示本次启动以来的日�
   } finally {
     box.cleanup()
   }
+})
+
+test('上次中断留下的安装锁会被判定为过期', () => {
+  const now = 1_700_000_000_000
+  assert.equal(isLockStale(JSON.stringify({ pid: 999999, ts: now }), now, () => false), true)
+  assert.equal(isLockStale(JSON.stringify({ pid: 4242, ts: now }), now, () => true), false)
+  assert.equal(isLockStale(JSON.stringify({ ts: now - STALE_LOCK_MS - 1 }), now, () => true), true)
+  assert.equal(isLockStale(JSON.stringify({ ts: now }), now, () => true), false)
+  assert.equal(isLockStale('not json'), true)
+  assert.equal(isLockStale('null'), true)
+})
+
+test('安装中断后再启动：接管过期锁并继续安装，不空等', async () => {
+  const box = sandbox()
+  try {
+    mkdirSync(box.stateDir, { recursive: true })
+    writeFileSync(join(box.stateDir, 'install.lock'), JSON.stringify({ pid: 999999, ts: Date.now() }))
+    const deps = makeDeps()
+    // 安装脚本“成功”后让 magpie 变得可用
+    deps.runAsync = async (cmd, args) => {
+      if (cmd === 'sh') writeFileSync(join(box.binDir, 'magpie'), '#!/bin/sh\nexit 0\n')
+      return { ok: true, status: 0, error: '', output: '' }
+    }
+    const controller = createController({ platform: 'linux', binDir: box.binDir, stateDir: box.stateDir, deps })
+    assert.equal(await controller.ensureInstalled(), true)
+    assert.match(controller.snapshot().logTail, /已接管/)
+    assert.equal(existsSync(join(box.stateDir, 'install.lock')), false)
+    controller.dispose()
+  } finally {
+    box.cleanup()
+  }
+})
+
+test('命令输出按行拆分：处理 \\r 进度条、去尾空白、限长', () => {
+  assert.deepEqual(splitLogChunk('a\r\nb\rc\n\n  d  '), ['a', 'b', 'c', '  d'])
+  assert.deepEqual(splitLogChunk('x'.repeat(500))[0].length, 400)
+  assert.deepEqual(splitLogChunk(''), [])
 })
