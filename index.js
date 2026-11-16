@@ -14,6 +14,16 @@ const LOG_FILE = join(STATE_DIR, 'autostart.log');
 const LOCK_FILE = join(STATE_DIR, 'install.lock');
 const INSTALLER_URL = 'https://usemagpie.ai/install.sh';
 const PROXY = process.env.MAGPIE_PROXY || 'http://127.0.0.1:10808';
+
+// 网关地址：magpie 自己读 MAGPIE_ADDR，默认 127.0.0.1:3425
+const GATEWAY = (() => {
+  const raw = (process.env.MAGPIE_ADDR || '127.0.0.1:3425').trim();
+  const cut = raw.lastIndexOf(':');
+  const port = Number(cut >= 0 ? raw.slice(cut + 1) : raw) || 3425;
+  let host = (cut >= 0 ? raw.slice(0, cut) : '127.0.0.1').replace(/^\[|\]$/g, '') || '127.0.0.1';
+  if (host === '0.0.0.0' || host === '::' || host === '*') host = '127.0.0.1';
+  return { host, port };
+})();
 const BASHRC = join(HOME, '.bashrc');
 const BASHRC_LINE = `export PATH="${BIN_DIR}:$PATH"`;
 
@@ -106,8 +116,9 @@ function magpieWorks() {
   return run(BIN, ['--version'], { timeout: 20000 }).ok;
 }
 
+// 网关是否在跑：magpie 没有 healthcheck 子命令，直接探监听端口
 function gatewayHealthy() {
-  return run(BIN, ['healthcheck'], { timeout: 8000 }).ok;
+  return probeProxy(GATEWAY.host, GATEWAY.port, 1500);
 }
 
 // 安装前置：curl 与 CA 证书（apt-get 耗时，用异步）
@@ -288,22 +299,12 @@ export function apply(ctx) {
       child = null;
     };
 
-    // 快路径：已安装且网关在跑，直接结束
-    if (magpieWorks()) {
-      if (gatewayHealthy()) {
-        log('magpie 已在运行');
-        return;
-      }
-      startGateway();
-      return stopGateway;
-    }
-
-    // 慢路径：先安装，装好再启动（异步，不阻塞 DSH 启动）
+    // 未装则先安装，装好后确认网关；健康探测是异步的，整条路径都在异步里跑，不阻塞 DSH 启动
     (async () => {
-      const ok = await ensureInstalled();
-      if (disposed || !ok) return;
-      if (gatewayHealthy()) {
-        log('magpie 已在运行');
+      if (!magpieWorks() && !(await ensureInstalled())) return;
+      if (disposed) return;
+      if (await gatewayHealthy()) {
+        log(`网关已在运行（${GATEWAY.host}:${GATEWAY.port}）`);
         return;
       }
       startGateway();

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Magpie 自动安装与启动",
+    "description": "在 DSH Go 内置的 Ubuntu 环境里自动安装 magpie，并在 DSH 打开期间托管它的本地网关（127.0.0.1:3425），无需手动安装。"
+  }
+}
