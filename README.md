@@ -1,80 +1,95 @@
 # dsh-go-magpie-autostart
 
-为 [DSH Go](https://github.com/ccch1mneyyy/dsh-Go) 定制的 [magpie](https://github.com/yetone/magpie) 安装、部署、启动插件：DSH 启动时把 magpie 装好并拉起它的本地网关，DSH 退出时把网关收掉。
+为 [DSH Go](https://github.com/ccch1mneyyy/dsh-Go) 定制的 [magpie](https://github.com/yetone/magpie) 安装、启动插件。它在 DSH Go 的引擎里装好 magpie，并把 magpie 的本地网关（或网关 + 网页版）托管到 DSH 的生命周期上；App 里给一个原生面板看状态、改设置。
 
-## 为什么需要
+## 面板
 
-DSH Go 自带一个免 Root 的 Ubuntu 环境跑 DSH 引擎。里面没有桌面、也没有 systemd，`magpie serve` 没有东西托管它：手动 `curl | sh` 装完之后，每次重开 App 都要再敲一遍，而且 `--gui` 那条路在无桌面环境里走不通。
+在对话详情页「插件」页签、「全部功能」或插件自己的入口打开 **Magpie**：
 
-这个插件把"装 magpie"和"起网关"挂到 DSH 的插件生命周期上，装一次，之后随 DSH 自动起停。
+- 状态：未安装 / 正在安装 / 运行中（本插件启动 / 已在别处启动）/ 已安装未运行；版本、当前启动方式、网关地址、网页版地址。
+- 按钮：安装 / 重装、启动、停止、复制网关地址、复制网页版地址。
+- 设置表单：启动方式、代理用法、安装代理、随引擎自动启动；保存后立刻生效。
+
+面板走 dsh-go 桥接，只在手机本机引擎（以及装了桥接的主机）显示；没有桥接的主机只保留引擎侧行为，插件照样装、照样起网关。
+
+## 两项能力
+
+### 启动方式：网关 or 网关 + 网页
+
+- `serve`（默认）：跑 `magpie serve`，只有本地网关（`http://127.0.0.1:3425`），给 Claude Code、Codex 这类 agent 用。
+- `web`：跑 `magpie web`，网关之外再起 magpie 的网页控制台（`http://127.0.0.1:3430`）。
+
+App 不能直接打开 `http://` 链接（`link` 效果只收 https），所以面板给的是「复制网页版地址」：复制后粘到浏览器打开。
+
+### 安装代理
+
+安装代理可配，三种用法：
+
+- `fallback`（默认）：先直连下载 `install.sh`，失败且代理端口在监听时再用代理重试。
+- `always`：只用代理。
+- `off`：不用代理。
+
+代理地址写完整 URL，支持 `http://`、`https://`、`socks5://`、`socks5h://`；空串表示没填。
+
+## 安装
+
+dsh-go 原生插件是放在主机上的 npm 包目录，装的是指向该目录的链接：
+
+```sh
+# 放到本机环境里（重置引擎时这个目录默认保留）
+git clone https://github.com/Hipple/dsh-go-magpie-autostart ~/.dsh/dsh-go/plugins/dsh-go-magpie-autostart
+dsh plugin --profile web add ~/.dsh/dsh-go/plugins/dsh-go-magpie-autostart
+```
+
+装上即生效，不用重启。改了 `lib/` 里的代码要在 App 的「引擎」页重启引擎才生效；只改 `package.json` 的 `dshGo` 会自动重读。卸载：`dsh plugin --profile web remove dsh-go-magpie-autostart`。
+
+同一个包也是普通 Cordis bundle（`dsh.bundle.patch`），装进 Harness 网页版时没有原生面板，只有引擎侧行为。
 
 ## 行为
 
-1. 探测 `~/.local/bin/magpie --version`。
-2. 不可用就安装：
-   - 缺 `curl` 时先 `apt-get install -y curl ca-certificates`；
-   - 下载官方脚本 `https://usemagpie.ai/install.sh`；
-   - `sh install.sh --tui`，只装终端版，不装桌面版；
-   - 直连失败、且本机 `127.0.0.1:10808` 在监听时，走代理重试一次；
-   - 把 `magpie` 软链到 `/usr/local/bin/magpie`——`/usr/local/bin` 本来就在 PATH 里，对话里可以直接敲 `magpie`。
-3. 探网关端口（默认 `127.0.0.1:3425`）：已有 magpie 网关在跑就直接复用，不重复启动。
-4. 否则 `magpie serve` 拉起网关，输出写进日志。
-5. 插件卸载或 DSH 退出时，向自己起的网关发 `SIGTERM`。
+1. 探测 `~/.local/bin/magpie --version`；可用就直接复用。
+2. 不可用则安装：缺 `curl` 先 `apt-get install -y curl ca-certificates`，下载官方 `install.sh`，`sh install.sh --tui`（只装终端版）；按代理设置决定直连 / 代理。
+3. 把 `magpie` 软链到 `/usr/local/bin/magpie`——`/usr/local/bin` 在 PATH 里，且不在 dsh-Go 引擎升级的替换清单中；同名普通文件不覆盖。
+4. 探端口：已有网关在跑就复用，不重复启动。
+5. 否则按启动方式跑 `magpie serve` / `magpie web`，输出写日志。
+6. 插件卸载或引擎退出时，向自己启动的进程发 `SIGTERM`。
 
-安装和启动都在异步里执行，不阻塞 DSH 启动。安装过程持有锁文件 `install.lock`，多个 DSH 实例不会同时安装；抢不到锁的实例会轮询等待最多 10 分钟。
+安装和启动都在异步里跑，不阻塞引擎启动；安装持锁，多实例不会同时装。面板每 2 秒探一次端口刷新状态。安装耗时超过点按的 3 秒窗口，所以「安装」动作只回提示，进度通过面板数据推送。
 
-## 环境变量
+## 设置存放
 
-**在 dsh-Go 里这些变量没有设置入口。** 引擎进程的环境由启动清单固定（`env -i`：`HOME=/root`、`USER=root`、`DSH_HOME=/root/.dsh`、`PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`），宿主环境和 `.bashrc` 都改不到它，所以实际一律取默认值——恰好就是下面这组，能用，但不可配。
+设置写在插件目录下的 `data/settings.json`，由面板表单维护。旧的环境变量仍作为初值：
 
 | 变量 | 默认值 | 作用 |
 | --- | --- | --- |
 | `MAGPIE_HOME` | `/root` | 用户名下目录的基准 |
-| `MAGPIE_BIN_DIR` | `$MAGPIE_HOME/.local/bin` | magpie 可执行文件所在目录 |
-| `MAGPIE_STATE_DIR` | `$MAGPIE_HOME/.local/state/magpie` | 日志与锁文件目录 |
-| `MAGPIE_ADDR` | `127.0.0.1:3425` | 网关监听地址；插件按它决定健康探测的目标 |
-| `MAGPIE_PROXY` | `http://127.0.0.1:10808` | 直连安装失败后的重试代理 |
-| `MAGPIE_LINK_PATH` | `/usr/local/bin/magpie` | 方便直接敲 `magpie` 的软链位置 |
+| `MAGPIE_BIN_DIR` | `$MAGPIE_HOME/.local/bin` | magpie 可执行文件目录 |
+| `MAGPIE_STATE_DIR` | `$MAGPIE_HOME/.local/state/magpie` | 日志与锁 |
+| `MAGPIE_ADDR` | `127.0.0.1:3425` | 网关监听地址 |
+| `MAGPIE_WEB_ADDR` | `127.0.0.1:3430` | 网页版监听地址（`magpie web`） |
+| `MAGPIE_LINK_PATH` | `/usr/local/bin/magpie` | 方便直接敲 `magpie` 的软链 |
+| `MAGPIE_PROXY` | `http://127.0.0.1:10808` | 代理初值 |
 
-这些名字只在自建 Linux 主机上（自己控进程环境时）才有意义。要把它们做成 dsh-Go 上可配，正确做法是改用 cordis `Config`（DSH 设置界面可改、存在 `root/.dsh/profiles`，属于重置仍保留的路径），而不是读 `process.env`。
+注意：在 dsh-go 里引擎进程的环境由启动清单固定（`env -i`，`HOME=/root`、`DSH_HOME=/root/.dsh`），宿主和 `.bashrc` 改不到它，所以这些变量实际取默认值；想改就用面板里的设置。
 
 ## dsh-Go 里的持久化
-
-magpie 装在 `/root` 下，日志和锁也在 `/root` 下。各操作之后：
 
 | 内容 | App 重启 | 引擎升级 | APK 覆盖升级 | 重置运行环境 | 卸载 App |
 | --- | --- | --- | --- | --- | --- |
 | `root/.local/bin/magpie` | 保留 | 保留 | 保留 | 删除 | 删除 |
 | `root/.local/state/magpie` | 保留 | 保留 | 保留 | 删除 | 删除 |
 | `usr/local/bin/magpie` 软链 | 保留 | 保留 | 保留 | 删除 | 删除 |
+| 插件的 `data/settings.json` | 保留 | 保留 | 保留 | 选了保留插件则保留 | 删除 |
 
-引擎升级只替换固定路径（`opt/dsh`、`opt/node`、`opt/dsh-go`、`etc/dsh-app`、`etc/profile.d/dsh-app.sh`、`usr/local/lib/node_modules/pnpm` 与 `usr/local/bin/{dsh,node,npm,npx,corepack,pnpm…}`），`/root` 和 `/usr/local/bin/magpie` 都不在内。「重置运行环境」只保留 `root/.dsh` 的少数几项，所以会清掉 magpie；插件下次启动会自动重装并重建软链。
+引擎升级只替换 `opt/dsh`、`opt/node`、`opt/dsh-go`、`etc/dsh-app`、`etc/profile.d/dsh-app.sh`、`usr/local/lib/node_modules/pnpm` 与 `usr/local/bin/{dsh,node,npm,npx,corepack,pnpm…}`，`/root` 和 `/usr/local/bin/magpie` 都不在内。重置引擎只保留 `root/.dsh` 的少数几项；magpie 会丢，下次启动插件自动重装。
 
-不要往 `/etc/profile.d/dsh-app.sh` 写任何东西：它每次引擎升级都会被替换。也不要依赖 `~/.bashrc`：DSH 的 bash 工具是 `bash -c`（非登录、非交互），不会读它。
+不要往 `/etc/profile.d/dsh-app.sh` 写东西（每次引擎升级被替换），也不要依赖 `~/.bashrc`（引擎的 bash 工具是 `bash -c`，不读它）。
 
-## 安装
-
-本仓库是一个 DSH bundle：`package.json` 的 `dsh.bundle.patch` 指向 `cordis.patch.yml`，后者插入插件条目。装进任意 DSH profile（包括 DSH Go 里那个）即可，启用后无需配置。
-
-## 排障
-
-日志在 `$MAGPIE_STATE_DIR/autostart.log`（默认 `/root/.local/state/magpie/autostart.log`）。常见情况：
-
-- `网关已在运行（127.0.0.1:3425）`：已经有一个 magpie 网关（可能是你在 TUI/桌面版里开的），插件不会再起第二个。
-- `下载安装脚本失败`：检查网络；确认手机上的代理端口确实在 `10808`，否则改 `MAGPIE_PROXY`。
-- `安装脚本执行完毕，但 magpie 仍不可用`：看 `install.sh` 自己的输出，多为缺 `webkitgtk` 之类的提示；无桌面环境应该走 `--tui`，若仍失败按 magpie 文档用 `go install github.com/yetone/magpie@latest`。
-
-- `magpie: command not found`：软链没建成（`/usr/local/bin` 不可写，或那里已有同名普通文件，插件不会覆盖它）。看日志里那行 `创建软链 … 失败`；临时可用全路径 `/root/.local/bin/magpie`。
-
-手动验证：
+## 开发
 
 ```sh
-/root/.local/bin/magpie --version
-nc -z 127.0.0.1 3425 && echo gateway up
+npm test                                   # 单元测试
+node <dsh-go>/sdk/plugin-kit/bin/check.mjs . --load   # 原生清单 + 视图 + 宿主半侧检查
 ```
 
-## 注意
-
-- 插件不管理 magpie 的模型与账号配置；首次使用仍需在 magpie 里添加 provider，或改用 `magpie provider add`。
-- 只负责"活着"：网关异常退出后不会自动重启（DSH 下次加载插件时会补起）。
-- 与 magpie 自己写 DSH profile 的 provider 配置互不冲突：那改的是 provider，本插件插入的是一条插件条目。
+`dshGo` 清单：v1，一个面板 `magpie`，位置 `session.tab` / `features` / `plugin`。面板视图 v2（表单 + 按钮），App 不具备 v2 组件时退回 v1 只读摘要。

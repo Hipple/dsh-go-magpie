@@ -1,21 +1,30 @@
 {
   "name": "dsh-go-magpie-autostart",
-  "version": "1.0.2",
-  "description": "Installs magpie inside DSH Go's built-in Ubuntu environment and keeps its local gateway running while DSH is open.",
+  "version": "1.1.0",
+  "description": "Installs magpie inside DSH Go's built-in Ubuntu environment and keeps its gateway (or gateway plus web console) running, with a native settings panel.",
   "type": "module",
-  "main": "index.js",
+  "main": "lib/index.js",
   "exports": {
-    ".": "./index.js",
+    ".": "./lib/index.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
   "files": [
-    "index.js",
+    "lib",
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
     "README.md"
   ],
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=22.19",
+    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
+  },
   "keywords": [
     "dsh",
     "dsh-plugin",
@@ -33,6 +42,21 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    }
+  },
+  "dshGo": {
+    "v": 1,
+    "title": { "zh": "Magpie 网关", "en": "Magpie gateway" },
+    "icon": "server",
+    "contributes": {
+      "panels": [
+        {
+          "id": "magpie",
+          "title": { "zh": "Magpie", "en": "Magpie" },
+          "icon": "server",
+          "placement": ["session.tab", "features", "plugin"]
+        }
+      ]
     }
   }
 }

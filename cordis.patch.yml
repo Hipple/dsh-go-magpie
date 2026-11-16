@@ -1,3 +1,4 @@
+# id: any unique id; name: must equal "name" in package.json.
 - insert:
     - id: dsh-go-magpie-autostart
       name: dsh-go-magpie-autostart

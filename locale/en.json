@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Magpie autostart",
-    "description": "Installs magpie inside DSH Go's built-in Ubuntu environment and keeps its local gateway (127.0.0.1:3425) running while DSH is open, with no manual setup."
+    "title": "Magpie gateway",
+    "description": "Installs magpie inside DSH Go's built-in Ubuntu environment and keeps its local gateway (or gateway plus web console) running, with a native panel for status, start mode and the install proxy."
   }
 }
