@@ -154,3 +154,32 @@ test('每次进入页签都重新推一份最新数据（不依赖视图缓存�
 
 
 
+
+test('查看状态按钮把结果写进日志并请求刷新', () => {
+  const { panel, dispose } = setup()
+  try {
+    const effects = panel.definition.actions.status({}, {})
+    assert.deepEqual(effects.map(effect => effect.type), ['toast', 'refresh'])
+    const emitted = []
+    const off = panel.definition.data({}, data => emitted.push(data))
+    off()
+    assert.match(emitted[0].logTail, /查看状态/)
+    assert.match(emitted[0].logTail, /magpie/)
+  } finally {
+    dispose()
+  }
+})
+
+test('启停动作在不可用时只回提示', () => {
+  const { panel, dispose } = setup()
+  try {
+    // 没安装、也没在跑：启动只回 toast
+    const start = panel.definition.actions.start({}, {})
+    assert.equal(Array.isArray(start), false)
+    assert.match(start.toast, /还没装好|正在安装|已经在运行/)
+    const stop = panel.definition.actions.stop({}, {})
+    assert.match(stop.toast, /没有由本插件启动/)
+  } finally {
+    dispose()
+  }
+})

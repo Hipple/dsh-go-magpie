@@ -114,3 +114,34 @@ test('视图在预算内：面板 ≤ 120 节点 / 8 层 / 32 KiB', () => {
 
 
 
+
+test('网关页结构：一份链接、两行按钮、按状态高亮', () => {
+  const stopped = buildView(state({ canStart: true, canStop: false, running: false }), caps, baseSettings)
+  const kids = stopped.children[0].items[0].children
+  assert.deepEqual(kids.map(node => node.type), ['keyValue', 'list', 'text', 'actions', 'actions', 'codeBlock'])
+  // 地址只出现在列表里，keyValue 不再重复
+  const keyValueText = JSON.stringify(kids[0])
+  assert.equal(keyValueText.includes('data.gatewayUrl'), false)
+  assert.ok(JSON.stringify(kids[1]).includes('data.gatewayUrl'))
+  // 第一行：启动 · 停止；停止不可用时启动是 primary
+  assert.deepEqual(kids[3].items.map(item => item.action), ['start', 'stop'])
+  assert.equal(kids[3].items[0].style, 'primary')
+  assert.equal(kids[3].items[1].style, undefined)
+  // 第二行：查看状态 · 安装
+  assert.deepEqual(kids[4].items.map(item => item.action), ['status', 'install'])
+
+  const running = buildView(state({ canStart: false, canStop: true, running: true, owned: true }), caps, baseSettings)
+  const runningActions = running.children[0].items[0].children[3]
+  assert.equal(runningActions.items[0].style, undefined)
+  assert.equal(runningActions.items[1].style, 'primary')
+})
+
+test('网页版没设固定 key 时提示重启后重新复制', () => {
+  const settings = { ...baseSettings, startMode: 'web', webKey: '' }
+  const data = panelData(state({ settings, webKeyEphemeral: true }), settings)
+  assert.match(data.noticeZh, /重新复制/)
+  assert.match(data.noticeEn, /copy the web address again/)
+  // 设了固定 key 就没有这条提示
+  const fixed = { ...baseSettings, startMode: 'web', webKey: 'k'.repeat(20) }
+  assert.equal(panelData(state({ settings: fixed, webKeyEphemeral: false }), fixed).noticeZh.includes('重新复制'), false)
+})
