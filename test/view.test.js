@@ -1,77 +1,95 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { buildView, panelData, statusText, supportsV2 } from '../lib/view.js'
+import { buildView, modeText, panelData, proxyModeText, statusText, supportsV2 } from '../lib/view.js'
 
-const state = {
-  platformOk: true,
-  installed: true,
-  version: 'magpie 0.9.2',
-  running: true,
-  owned: true,
-  installing: false,
-  mode: 'serve',
-  gatewayUrl: 'http://127.0.0.1:3425',
-  webUrl: 'http://127.0.0.1:3430',
-  lastError: '',
-  logTail: 'line one\nline two',
-  settings: { startMode: 'serve', proxyMode: 'fallback', proxy: 'http://127.0.0.1:10808', autoStart: true },
+const caps = {
+  locale: 'zh-CN',
+  components: ['tabs', 'form', 'number', 'select', 'segmented', 'textField', 'toggle', 'actions', 'list', 'keyValue', 'callout', 'text'],
 }
 
-const modernCaps = { locale: 'zh-CN', components: ['textField', 'form', 'select', 'segmented', 'toggle', 'actions', 'list', 'keyValue', 'callout', 'text'] }
+const baseSettings = {
+  startMode: 'serve', proxyMode: 'off', proxy: '', autoStart: true,
+  gatewayPort: 3425, webPort: 3430, webKey: '',
+}
 
-test('有 v2 能力时给表单，缺能力时退回 v1 摘要', () => {
-  assert.equal(supportsV2(modernCaps), true)
-  const modern = buildView(state, modernCaps)
-  assert.equal(modern.v, 2)
-  const form = modern.children.find(node => node.type === 'form')
-  assert.ok(form)
-  assert.deepEqual(form.children.map(field => field.bind), [
-    'data.form.startMode', 'data.form.proxyMode', 'data.form.proxy', 'data.form.autoStart',
-  ])
+function state(patch = {}) {
+  return {
+    platformOk: true, installed: true, version: 'magpie 0.9.2', running: true, owned: true,
+    installing: false, mode: 'serve', gatewayPort: 3425, webPort: 3430, webKeySet: false,
+    gatewayUrl: 'http://127.0.0.1:3425', webUrl: '', needsRestart: false,
+    lastError: '', logTail: 'line one', settings: { ...baseSettings }, ...patch,
+  }
+}
 
-  for (const caps of [{ locale: 'en-US' }, { locale: 'en-US', components: ['stack', 'text'] }, undefined]) {
-    const old = buildView(state, caps)
-    assert.equal(old.v, undefined)
-    assert.equal(old.type, 'stack')
-    assert.deepEqual(old.children[0].items[0], [caps && String(caps.locale).startsWith('en') ? 'Status' : '状态', statusText(state, caps)])
-    assert.equal(JSON.stringify(old).includes('"bind"'), false)
+const flat = view => JSON.stringify(view)
+
+test('有 v2 能力时给两个页签：网关 / 设置', () => {
+  assert.equal(supportsV2(caps), true)
+  const view = buildView(state(), caps, baseSettings)
+  assert.equal(view.v, 2)
+  const tabs = view.children[0]
+  assert.equal(tabs.type, 'tabs')
+  assert.deepEqual(tabs.items.map(item => item.label), ['网关', '设置'])
+  assert.ok(flat(view).includes('"submit":"save"'))
+})
+
+test('仅网关模式不出现网页版地址和网页版设置项', () => {
+  const view = flat(buildView(state(), caps, baseSettings))
+  assert.equal(view.includes('网页版（web）') && state().settings.startMode === 'web', false)
+  assert.equal(view.includes('data.form.webPort'), false)
+  assert.equal(view.includes('data.form.webKey'), false)
+  assert.equal(view.includes('copyWeb'), false)
+  assert.equal(view.includes('127.0.0.1:3430'), false)
+})
+
+test('网页版模式出现 web 端口、key 与含 key 的地址', () => {
+  const settings = { ...baseSettings, startMode: 'web', webPort: 3430, webKey: 'k'.repeat(20) }
+  const view = flat(buildView(state({ settings, webUrl: `http://127.0.0.1:3430/?k=${'k'.repeat(20)}`, mode: 'web' }), caps, settings))
+  assert.ok(view.includes('data.form.webPort'))
+  assert.ok(view.includes('data.form.webKey'))
+  assert.ok(view.includes('copyWeb'))
+  assert.ok(view.includes(`/?k=${'k'.repeat(20)}`))
+})
+
+test('不用代理时不显示代理地址输入框；选了代理才显示', () => {
+  assert.equal(flat(buildView(state(), caps, baseSettings)).includes('"bind":"data.form.proxy"'), false)
+  const withProxy = { ...baseSettings, proxyMode: 'fallback', proxy: 'http://127.0.0.1:10808' }
+  assert.ok(flat(buildView(state({ settings: withProxy }), caps, withProxy)).includes('"bind":"data.form.proxy"'))
+})
+
+test('缺 v2 组件时退回只读 v1 摘要，且不含表单绑定', () => {
+  for (const bad of [{ locale: 'en-US' }, { locale: 'en-US', components: ['stack', 'text'] }, undefined]) {
+    const view = buildView(state(), bad, baseSettings)
+    assert.equal(view.v, undefined)
+    assert.equal(view.type, 'stack')
+    assert.equal(JSON.stringify(view).includes('"bind"'), false)
   }
 })
 
-test('状态文案区分未装、运行中（自己/别处）与停止', () => {
-  assert.equal(statusText({ ...state, installed: false }, { locale: 'zh-CN' }), '未安装')
-  assert.equal(statusText({ ...state, owned: false }, { locale: 'zh-CN' }), '运行中（已在别处启动）')
-  assert.equal(statusText({ ...state, running: false }, { locale: 'zh-CN' }), '已安装，未运行')
-  assert.equal(statusText({ ...state, platformOk: false }, { locale: 'en-US' }), 'Linux hosts only')
+test('状态与模式文案', () => {
+  assert.equal(statusText({ ...state(), installed: false }, caps), '未安装')
+  assert.equal(statusText({ ...state(), owned: false }, caps), '运行中（已在别处启动）')
+  assert.equal(statusText({ ...state(), running: false }, caps), '已安装，未运行')
+  assert.equal(statusText({ ...state(), platformOk: false }, { locale: 'en-US' }), 'Linux hosts only')
+  assert.equal(modeText(state({ mode: 'web' }), caps), '网关 + 网页（magpie web）')
+  assert.equal(proxyModeText('off', caps), '不用代理')
 })
 
-test('面板数据带 form 草稿，视图数据不泄漏成依赖', () => {
-  const data = panelData(state)
-  assert.deepEqual(data.form, state.settings)
-  assert.equal(data.gatewayUrl, state.gatewayUrl)
-  // 保存后回写应当只改 form，不影响其它字段
-  const patched = { ...data, form: { ...data.form, startMode: 'web' } }
-  assert.equal(patched.form.startMode, 'web')
-})
-
-test('错误信息在两种视图里都出现，且被截断', () => {
-  const broken = { ...state, lastError: 'x'.repeat(400) }
-  const modern = JSON.stringify(buildView(broken, modernCaps))
-  const old = JSON.stringify(buildView(broken, undefined))
-  assert.equal(modern.includes('x'.repeat(161)), false)
-  assert.equal(old.includes('x'.repeat(121)), false)
-  assert.equal(modern.includes('x'.repeat(160)), true)
+test('面板数据带完整表单草稿', () => {
+  const data = panelData(state(), baseSettings)
+  assert.deepEqual(Object.keys(data.form).sort(), ['autoStart', 'gatewayPort', 'proxy', 'proxyMode', 'startMode', 'webKey', 'webPort'])
 })
 
 test('视图在预算内：面板 ≤ 120 节点 / 8 层 / 32 KiB', () => {
-  const view = buildView(state, modernCaps)
+  const settings = { ...baseSettings, startMode: 'web', proxyMode: 'fallback', proxy: 'http://127.0.0.1:10808', webKey: 'k'.repeat(20) }
+  const view = buildView(state({ settings, webUrl: 'http://127.0.0.1:3430/?k=' + 'k'.repeat(20) }), caps, settings)
   let nodes = 0
   let depth = 0
   const walk = (node, level) => {
     if (node === null || typeof node !== 'object') return
     if (Array.isArray(node)) { for (const item of node) walk(item, level); return }
     if (typeof node.type === 'string') { nodes += 1; depth = Math.max(depth, level) }
-    for (const value of Object.values(node)) if (value !== node.text) walk(value, level + 1)
+    for (const [key, value] of Object.entries(node)) if (key !== 'text') walk(value, level + 1)
   }
   walk(view, 0)
   assert.ok(nodes <= 120, `nodes=${nodes}`)

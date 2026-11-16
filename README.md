@@ -1,42 +1,48 @@
 # dsh-go-magpie-autostart
 
-为 [DSH Go](https://github.com/ccch1mneyyy/dsh-Go) 定制的 [magpie](https://github.com/yetone/magpie) 安装、启动插件。它在 DSH Go 的引擎里装好 magpie，并把 magpie 的本地网关（或网关 + 网页版）托管到 DSH 的生命周期上；App 里给一个原生面板看状态、改设置。
+为 [DSH Go](https://github.com/ccch1mneyyy/dsh-Go) 定制的 [magpie](https://github.com/yetone/magpie) 安装、启动插件。它在 DSH Go 的引擎里装好 magpie，把 magpie 的本地网关（或网关 + 网页版）托管到 DSH 的生命周期上；App 里给一个原生面板看状态、改设置。
 
 ## 面板
 
-在对话详情页「插件」页签、「全部功能」或插件自己的入口打开 **Magpie**：
+面板分两个页签。入口在对话详情页「插件」页签、「全部功能」或插件自己的入口。
 
-- 状态：未安装 / 正在安装 / 运行中（本插件启动 / 已在别处启动）/ 已安装未运行；版本、当前启动方式、网关地址、网页版地址。
-- 按钮：安装 / 重装、启动、停止、复制网关地址、复制网页版地址。
-- 设置表单：启动方式、代理用法、安装代理、随引擎自动启动；保存后立刻生效。
+**网关**
 
-面板走 dsh-go 桥接，只在手机本机引擎（以及装了桥接的主机）显示；没有桥接的主机只保留引擎侧行为，插件照样装、照样起网关。
+- 状态：未安装 / 正在安装 / 运行中（本插件启动 / 已在别处启动）/ 已安装未运行；版本、当前启动方式、网关地址。
+- 仅「网关 + 网页」模式才出现网页版地址（含 key）。仅网关时这里不显示任何网页版信息。
+- 按钮：安装 / 重装、启动、停止；复制网关地址、复制网页版地址（仅网页版模式）。
+- 需要重启或出错时会给出提示条；下面是最近几行日志。
 
-## 两项能力
+**设置**
 
-### 启动方式：网关 or 网关 + 网页
+- 启动方式：`serve`（仅网关，默认）或 `web`（`magpie web`，网关 + 网页控制台）。
+- 网关端口（默认 3425）。
+- 选了「网关 + 网页」再多两项：网页版端口（默认 3430）、网页版 key（`MAGPIE_WEB_KEY`，留空则每次启动由 magpie 随机生成）。
+- 代理用法：不用代理（默认）/ 直连失败再用 / 始终使用；只有选了前两者之外（非「不用代理」）才显示代理地址输入框。
+- 随引擎自动启动。
 
-- `serve`（默认）：跑 `magpie serve`，只有本地网关（`http://127.0.0.1:3425`），给 Claude Code、Codex 这类 agent 用。
-- `web`：跑 `magpie web`，网关之外再起 magpie 的网页控制台（`http://127.0.0.1:3430`）。
+改启动方式或代理用法会立刻调整字段显隐（不用点保存）；点「保存设置」后落盘，面板内容同步刷新。如果网关是本插件起的，改启动方式 / 端口 / key 会自动重启网关；没在运行就只更新设置。
 
-App 不能直接打开 `http://` 链接（`link` 效果只收 https），所以面板给的是「复制网页版地址」：复制后粘到浏览器打开。
+面板走 dsh-go 桥接，只在手机本机引擎（以及装了桥接的主机）显示；没有桥接的主机只保留引擎侧行为。
 
-### 安装代理
+## 启动方式
 
-安装代理可配，三种用法：
+- `serve`：跑 `magpie serve`，只有本地网关（`http://127.0.0.1:<网关端口>`），给 Claude Code、Codex 这类 agent 用。
+- `web`：跑 `magpie web --addr 127.0.0.1:<网页端口> --no-open`，网关之外再起 magpie 网页控制台，地址形如 `http://127.0.0.1:<网页端口>/?k=<key>`。
 
-- `fallback`（默认）：先直连下载 `install.sh`，失败且代理端口在监听时再用代理重试。
-- `always`：只用代理。
-- `off`：不用代理。
+App 不能直接打开 `http://` 链接（`link` 效果只收 https），所以面板给的是「复制网页版地址」：复制出来就带 key，粘到浏览器即可。
 
-代理地址写完整 URL，支持 `http://`、`https://`、`socks5://`、`socks5h://`；空串表示没填。
+key 从哪来：设置里填了就用 `MAGPIE_WEB_KEY` 传给 magpie；留空时 magpie 每次启动自己生成，插件从启动日志里取 `?k=` 后面的值拼进复制地址。
+
+## 安装代理
+
+三态 + 一个地址：`off`（默认，不用代理）/ `fallback`（先直连，失败且代理端口在监听时重试）/ `always`（只用代理）。地址支持 `http://`、`https://`、`socks5://`、`socks5h://`；选「不用代理」时地址留空。
 
 ## 安装
 
 dsh-go 原生插件是放在主机上的 npm 包目录，装的是指向该目录的链接：
 
 ```sh
-# 放到本机环境里（重置引擎时这个目录默认保留）
 git clone https://github.com/Hipple/dsh-go-magpie-autostart ~/.dsh/dsh-go/plugins/dsh-go-magpie-autostart
 dsh plugin --profile web add ~/.dsh/dsh-go/plugins/dsh-go-magpie-autostart
 ```
@@ -58,19 +64,18 @@ dsh plugin --profile web add ~/.dsh/dsh-go/plugins/dsh-go-magpie-autostart
 
 ## 设置存放
 
-设置写在插件目录下的 `data/settings.json`，由面板表单维护。旧的环境变量仍作为初值：
+设置写在插件目录下的 `data/settings.json`，由面板表单维护。环境变量仍作为初值：
 
 | 变量 | 默认值 | 作用 |
 | --- | --- | --- |
 | `MAGPIE_HOME` | `/root` | 用户名下目录的基准 |
 | `MAGPIE_BIN_DIR` | `$MAGPIE_HOME/.local/bin` | magpie 可执行文件目录 |
 | `MAGPIE_STATE_DIR` | `$MAGPIE_HOME/.local/state/magpie` | 日志与锁 |
-| `MAGPIE_ADDR` | `127.0.0.1:3425` | 网关监听地址 |
-| `MAGPIE_WEB_ADDR` | `127.0.0.1:3430` | 网页版监听地址（`magpie web`） |
+| `MAGPIE_ADDR` | `127.0.0.1` | 监听主机（端口由设置里的网关端口决定） |
 | `MAGPIE_LINK_PATH` | `/usr/local/bin/magpie` | 方便直接敲 `magpie` 的软链 |
-| `MAGPIE_PROXY` | `http://127.0.0.1:10808` | 代理初值 |
+| `MAGPIE_PROXY` | 空 | 代理初值（默认不用代理） |
 
-注意：在 dsh-go 里引擎进程的环境由启动清单固定（`env -i`，`HOME=/root`、`DSH_HOME=/root/.dsh`），宿主和 `.bashrc` 改不到它，所以这些变量实际取默认值；想改就用面板里的设置。
+在 dsh-go 里引擎进程的环境由启动清单固定（`env -i`，`HOME=/root`、`DSH_HOME=/root/.dsh`），宿主和 `.bashrc` 改不到它，所以这些变量实际取默认值；要改就用面板里的设置。
 
 ## dsh-Go 里的持久化
 
@@ -88,8 +93,8 @@ dsh plugin --profile web add ~/.dsh/dsh-go/plugins/dsh-go-magpie-autostart
 ## 开发
 
 ```sh
-npm test                                   # 单元测试
+npm test                                              # 单元测试
 node <dsh-go>/sdk/plugin-kit/bin/check.mjs . --load   # 原生清单 + 视图 + 宿主半侧检查
 ```
 
-`dshGo` 清单：v1，一个面板 `magpie`，位置 `session.tab` / `features` / `plugin`。面板视图 v2（表单 + 按钮），App 不具备 v2 组件时退回 v1 只读摘要。
+`dshGo` 清单：v1，一个面板 `magpie`，位置 `session.tab` / `features` / `plugin`。面板视图 v2（页签 + 表单 + 按钮），App 不具备 v2 组件时退回 v1 只读摘要。

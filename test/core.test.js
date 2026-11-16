@@ -3,27 +3,22 @@ import { test } from 'node:test'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createController, parseAddr, proxyEndpoint } from '../lib/core.js'
+import { createController, keyFromText, parseAddr, proxyEndpoint } from '../lib/core.js'
 
-function makeDeps() {
+function makeDeps(logText = '') {
   const spawned = []
   return {
     spawned,
     run: () => ({ ok: true, status: 0, error: '', output: 'magpie 1.2.3' }),
     runAsync: async () => ({ ok: true, status: 0, error: '', output: '' }),
-    spawn: (bin, args) => {
-      const child = {
-        pid: 4242,
-        killed: false,
-        kill() { this.killed = true },
-        on() {},
-        once() {},
-      }
-      spawned.push({ bin, args, child })
+    spawn: (bin, args, opts) => {
+      const child = { pid: 4242, killed: false, kill() { this.killed = true }, on() {}, once() {} }
+      spawned.push({ bin, args, opts, child })
       return child
     },
     probe: async () => false,
     exit: (child, cb) => { child.emitExit = cb },
+    readLog: () => logText,
   }
 }
 
@@ -50,6 +45,12 @@ test('代理 URL 能取出探测端口', () => {
   assert.deepEqual(proxyEndpoint('nonsense'), { host: '127.0.0.1', port: 10808 })
 })
 
+test('从 magpie web 日志里取出 ?k= 的 key', () => {
+  assert.equal(keyFromText('magpie web on http://127.0.0.1:3430/?k=0f3c9a1e5b7d4c2a'), '0f3c9a1e5b7d4c2a')
+  assert.equal(keyFromText('no key here'), '')
+  assert.equal(keyFromText('short ?k=abc'), '')
+})
+
 test('没装 magpie 时启动会被拒绝', () => {
   const box = sandbox()
   try {
@@ -63,43 +64,75 @@ test('没装 magpie 时启动会被拒绝', () => {
   }
 })
 
-test('magpie web 用 web 子命令启动，stop 会结束它', () => {
+test('网页版：--addr 用配置的 web 端口、--no-open、env 带 key，地址带 ?k=', () => {
   const box = sandbox()
   try {
     writeFileSync(join(box.binDir, 'magpie'), '#!/bin/sh\nexit 0\n')
     const deps = makeDeps()
     const controller = createController({
       platform: 'linux', binDir: box.binDir, stateDir: box.stateDir, deps,
-      settings: { startMode: 'web', proxyMode: 'off', proxy: '', autoStart: false },
+      settings: { startMode: 'web', gatewayPort: 5000, webPort: 5001, webKey: 'k'.repeat(20), proxyMode: 'off' },
     })
-    const started = controller.start()
-    assert.equal(started.ok, true)
-    assert.deepEqual(deps.spawned[0].args, ['web'])
-    assert.equal(controller.snapshot().running, true)
-    assert.equal(controller.snapshot().owned, true)
-
-    const stopped = controller.stop()
-    assert.equal(stopped.ok, true)
-    assert.equal(deps.spawned[0].child.killed, true)
+    assert.equal(controller.start().ok, true)
+    assert.deepEqual(deps.spawned[0].args, ['web', '--addr', '127.0.0.1:5001', '--no-open'])
+    const env = deps.spawned[0].opts.env
+    assert.equal(env.MAGPIE_ADDR, '127.0.0.1:5000')
+    assert.equal(env.MAGPIE_WEB_KEY, 'k'.repeat(20))
+    const state = controller.snapshot()
+    assert.equal(state.gatewayUrl, 'http://127.0.0.1:5000')
+    assert.equal(state.webUrl, `http://127.0.0.1:5001/?k=${'k'.repeat(20)}`)
+    assert.equal(state.webKeySet, true)
     controller.dispose()
   } finally {
     box.cleanup()
   }
 })
 
-test('serve 模式默认，且没有自己的子进程时 stop 不装作用', () => {
+test('没配 key 时从日志里取 magpie 生成的 key', () => {
+  const box = sandbox()
+  try {
+    writeFileSync(join(box.binDir, 'magpie'), '#!/bin/sh\nexit 0\n')
+    const deps = makeDeps('magpie web on http://127.0.0.1:3430/?k=abcdef0123456789')
+    const controller = createController({
+      platform: 'linux', binDir: box.binDir, stateDir: box.stateDir, deps,
+      settings: { startMode: 'web', proxyMode: 'off', webKey: '' },
+    })
+    assert.equal(controller.snapshot().webUrl, 'http://127.0.0.1:3430/?k=abcdef0123456789')
+    controller.dispose()
+  } finally {
+    box.cleanup()
+  }
+})
+
+test('仅网关模式：地址里没有 web，serve 不需要 web 参数', () => {
   const box = sandbox()
   try {
     writeFileSync(join(box.binDir, 'magpie'), '#!/bin/sh\nexit 0\n')
     const deps = makeDeps()
     const controller = createController({ platform: 'linux', binDir: box.binDir, stateDir: box.stateDir, deps })
-    assert.equal(controller.snapshot().settings.startMode, 'serve')
     controller.start()
     assert.deepEqual(deps.spawned[0].args, ['serve'])
+    assert.equal(deps.spawned[0].opts.env.MAGPIE_WEB_KEY, undefined)
+    assert.equal(controller.snapshot().webUrl, '')
     controller.dispose()
-    const idle = createController({ platform: 'linux', binDir: box.binDir, stateDir: box.stateDir, deps: makeDeps() })
-    assert.equal(idle.stop().ok, false)
-    idle.dispose()
+  } finally {
+    box.cleanup()
+  }
+})
+
+test('保存新设置时如果是自己起的进程会重启，未运行则只更新', () => {
+  const box = sandbox()
+  try {
+    writeFileSync(join(box.binDir, 'magpie'), '#!/bin/sh\nexit 0\n')
+    const deps = makeDeps()
+    const controller = createController({ platform: 'linux', binDir: box.binDir, stateDir: box.stateDir, deps })
+    assert.equal(controller.setSettings({ startMode: 'web', proxyMode: 'off', webPort: 3430 }).restarted, false)
+    controller.start()
+    assert.equal(controller.snapshot().needsRestart, false)
+    const saved = controller.setSettings({ startMode: 'serve', gatewayPort: 3500, proxyMode: 'off' })
+    assert.equal(saved.restarted, true)
+    assert.equal(controller.snapshot().needsRestart, true)
+    controller.dispose()
   } finally {
     box.cleanup()
   }
