@@ -4,7 +4,7 @@ import { buildView, modeText, panelData, proxyModeText, statusText, supportsV2 }
 
 const caps = {
   locale: 'zh-CN',
-  components: ['tabs', 'form', 'number', 'select', 'segmented', 'textField', 'toggle', 'actions', 'list', 'keyValue', 'callout', 'text'],
+  components: ['tabs', 'form', 'number', 'select', 'segmented', 'textField', 'toggle', 'actions', 'list', 'keyValue', 'callout', 'text', 'codeBlock'],
 }
 
 const baseSettings = {
@@ -80,6 +80,19 @@ test('面板数据带完整表单草稿', () => {
   assert.deepEqual(Object.keys(data.form).sort(), ['autoStart', 'gatewayPort', 'proxy', 'proxyMode', 'startMode', 'webKey', 'webPort'])
 })
 
+test('日志用 codeBlock（固定高度可滚动），缺这个组件时退回纯文本', () => {
+  const withBlock = buildView(state({ logTail: 'a\nb\nc' }), caps, baseSettings)
+  const gateway = withBlock.children[0].items[0].children
+  const block = gateway.find(node => node.type === 'codeBlock')
+  assert.ok(block)
+  assert.equal(block.code, 'a\nb\nc')
+  const noBlockCaps = { ...caps, components: caps.components.filter(name => name !== 'codeBlock') }
+  const noBlock = buildView(state({ logTail: 'a\nb\nc' }), noBlockCaps, baseSettings)
+  const textLike = noBlock.children[0].items[0].children.find(node => node.type === 'text')
+  assert.ok(textLike)
+  assert.equal(JSON.stringify(noBlock).includes('"type":"codeBlock"'), false)
+})
+
 test('视图在预算内：面板 ≤ 120 节点 / 8 层 / 32 KiB', () => {
   const settings = { ...baseSettings, startMode: 'web', proxyMode: 'fallback', proxy: 'http://127.0.0.1:10808', webKey: 'k'.repeat(20) }
   const view = buildView(state({ settings, webUrl: 'http://127.0.0.1:3430/?k=' + 'k'.repeat(20) }), caps, settings)
@@ -96,3 +109,4 @@ test('视图在预算内：面板 ≤ 120 节点 / 8 层 / 32 KiB', () => {
   assert.ok(depth <= 8, `depth=${depth}`)
   assert.ok(Buffer.byteLength(JSON.stringify(view), 'utf8') <= 32 * 1024)
 })
+

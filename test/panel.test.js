@@ -7,7 +7,7 @@ import { apply } from '../lib/index.js'
 
 const caps = {
   locale: 'zh-CN',
-  components: ['tabs', 'form', 'number', 'select', 'segmented', 'textField', 'toggle', 'actions', 'list', 'keyValue', 'callout', 'text'],
+  components: ['tabs', 'form', 'number', 'select', 'segmented', 'textField', 'toggle', 'actions', 'list', 'keyValue', 'callout', 'text', 'codeBlock'],
 }
 
 function stubContext() {
@@ -125,3 +125,4 @@ test('复制网页地址只在网页版模式给，并带 key', () => {
     dispose()
   }
 })
+

@@ -1,6 +1,6 @@
 {
   "name": "dsh-go-magpie-autostart",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Installs magpie inside DSH Go's built-in Ubuntu environment and keeps its gateway (or gateway plus web console) running, with a native settings panel.",
   "type": "module",
   "main": "lib/index.js",
@@ -60,4 +60,5 @@
     }
   }
 }
+
 

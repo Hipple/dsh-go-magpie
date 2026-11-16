@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createController, keyFromText, parseAddr, proxyEndpoint } from '../lib/core.js'
@@ -146,6 +146,24 @@ test('非 Linux 平台不安装也不启动', async () => {
     assert.equal(await controller.ensureInstalled(), false)
     assert.equal(controller.start().ok, false)
     assert.equal(controller.snapshot().platformOk, false)
+    controller.dispose()
+  } finally {
+    box.cleanup()
+  }
+})
+
+test('日志文件在构造时清空，面板只显示本次启动以来的日志', () => {
+  const box = sandbox()
+  try {
+    mkdirSync(box.stateDir, { recursive: true })
+    writeFileSync(join(box.stateDir, 'autostart.log'), 'old run line\n')
+    const controller = createController({ platform: 'linux', binDir: box.binDir, stateDir: box.stateDir, deps: makeDeps() })
+    assert.equal(readFileSync(join(box.stateDir, 'autostart.log'), 'utf8'), '')
+    controller.log('hello this run')
+    assert.match(readFileSync(join(box.stateDir, 'autostart.log'), 'utf8'), /hello this run/)
+    const shown = controller.snapshot().logTail
+    assert.match(shown, /hello this run/)
+    assert.equal(shown.includes('old run line'), false)
     controller.dispose()
   } finally {
     box.cleanup()
