@@ -31,7 +31,7 @@ function setup() {
   const dir = mkdtempSync(join(tmpdir(), 'magpie-panel-'))
   const settingsPath = join(dir, 'settings.json')
   const { ctx, panels, cleanups } = stubContext()
-  apply(ctx, { settingsPath })
+  apply(ctx, { settingsPath, autoStart: false })
   const panel = panels[0]
   const dispose = () => {
     for (const cleanup of cleanups) cleanup()
@@ -149,6 +149,7 @@ test('每次进入页签都重新推一份最新数据（不依赖视图缓存�
     dispose()
   }
 })
+
 
 
 
