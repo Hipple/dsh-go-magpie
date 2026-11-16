@@ -1,4 +1,4 @@
-# dsh-go-magpie-autostart
+# dsh-go-magpie
 
 为 [DSH Go](https://github.com/ccch1mneyyy/dsh-Go) 定制的 [magpie](https://github.com/yetone/magpie) 安装、启动插件。它在 DSH Go 的引擎里装好 magpie，把 magpie 的本地网关（或网关 + 网页版）托管到 DSH 的生命周期上；App 里给一个原生面板看状态、改设置。
 
@@ -45,11 +45,17 @@ key 从哪来：设置里填了就用 `MAGPIE_WEB_KEY` 传给 magpie；留空时
 dsh-go 原生插件是放在主机上的 npm 包目录，装的是指向该目录的链接：
 
 ```sh
-git clone https://github.com/Hipple/dsh-go-magpie-autostart ~/.dsh/dsh-go/plugins/dsh-go-magpie-autostart
-dsh plugin --profile web add ~/.dsh/dsh-go/plugins/dsh-go-magpie-autostart
+dsh plugin --profile web add dsh-go-magpie
 ```
 
-装上即生效，不用重启。改了 `lib/` 里的代码要在 App 的「引擎」页重启引擎才生效；只改 `package.json` 的 `dshGo` 会自动重读。卸载：`dsh plugin --profile web remove dsh-go-magpie-autostart`。
+也可以从源码装（装的是指向目录的链接，目录要留着）：
+
+```sh
+git clone https://github.com/Hipple/dsh-go-magpie ~/.dsh/dsh-go/plugins/dsh-go-magpie
+dsh plugin --profile web add ~/.dsh/dsh-go/plugins/dsh-go-magpie
+```
+
+装上即生效，不用重启。改了 `lib/` 里的代码要在 App 的「引擎」页重启引擎才生效；只改 `package.json` 的 `dshGo` 会自动重读。卸载：`dsh plugin --profile web remove dsh-go-magpie`。
 
 同一个包也是普通 Cordis bundle（`dsh.bundle.patch`），装进 Harness 网页版时没有原生面板，只有引擎侧行为。
 

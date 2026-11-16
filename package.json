@@ -1,6 +1,6 @@
 {
-  "name": "dsh-go-magpie-autostart",
-  "version": "1.2.2",
+  "name": "dsh-go-magpie",
+  "version": "1.3.0",
   "description": "Installs magpie inside DSH Go's built-in Ubuntu environment and keeps its gateway (or gateway plus web console) running, with a native settings panel.",
   "type": "module",
   "main": "lib/index.js",
@@ -34,10 +34,10 @@
     "autostart"
   ],
   "author": "Hipple",
-  "homepage": "https://github.com/Hipple/dsh-go-magpie-autostart#readme",
+  "homepage": "https://github.com/Hipple/dsh-go-magpie#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Hipple/dsh-go-magpie-autostart.git"
+    "url": "git+https://github.com/Hipple/dsh-go-magpie.git"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
