@@ -15,7 +15,7 @@
 
 **设置**
 
-- 启动方式：`serve`（仅网关，默认）或 `web`（`magpie web`，网关 + 网页控制台）。
+- 启动方式：`web`（`magpie web`，网关 + 网页控制台，默认）或 `serve`（仅网关）。
 - 网关端口（默认 3425）。
 - 选了「网关 + 网页」再多两项：网页版端口（默认 3430）、网页版 key（`MAGPIE_WEB_KEY`，留空则每次启动由 magpie 随机生成）。
 - 代理用法：不用代理（默认）/ 直连失败再用 / 始终使用；只有选了前两者之外（非「不用代理」）才显示代理地址输入框。
@@ -29,8 +29,8 @@
 
 ## 启动方式
 
-- `serve`：跑 `magpie serve`，只有本地网关（`http://127.0.0.1:<网关端口>`），给 Claude Code、Codex 这类 agent 用。
-- `web`：跑 `magpie web --addr 127.0.0.1:<网页端口> --no-open`，网关之外再起 magpie 网页控制台，地址形如 `http://127.0.0.1:<网页端口>/?k=<key>`。
+- `serve`：跑 `magpie serve`，只有本地网关（`http://127.0.0.1:<网关端口>`），给 Claude Code、Codex 这类 agent 用。需要时在设置里切过去。
+- `web`（默认）：跑 `magpie web --addr 127.0.0.1:<网页端口> --no-open`，网关之外再起 magpie 网页控制台，地址形如 `http://127.0.0.1:<网页端口>/?k=<key>`。
 
 App 不能直接打开 `http://` 链接（`link` 效果只收 https），所以面板给的是「复制网页版地址」：复制出来就带 key，粘到浏览器即可。
 
@@ -62,7 +62,7 @@ dsh plugin --profile web add ~/.dsh/dsh-go/plugins/dsh-go-magpie
 ## 行为
 
 1. 探测 `~/.local/bin/magpie --version`；可用就直接复用。
-2. 不可用则安装：缺 `curl` 先 `apt-get install -y curl ca-certificates`，下载官方 `install.sh`，`sh install.sh --tui`（只装终端版）；按代理设置决定直连 / 代理。
+2. 不可用则安装：`curl` 探测失败时先直接 `apt-get install -y curl ca-certificates`（失败才 `apt-get update` 后重试，省一轮索引下载）；下载官方 `install.sh`，`sh install.sh --tui`（只装终端版）；按代理设置决定直连 / 代理。
 3. 把 `magpie` 软链到 `/usr/local/bin/magpie`——`/usr/local/bin` 在 PATH 里，且不在 dsh-Go 引擎升级的替换清单中；同名普通文件不覆盖。
 4. 探端口：已有网关在跑就复用，不重复启动。
 5. 否则按启动方式跑 `magpie serve` / `magpie web`，输出写日志。

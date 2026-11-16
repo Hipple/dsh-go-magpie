@@ -109,7 +109,7 @@ test('仅网关模式：地址里没有 web，serve 不需要 web 参数', () =>
   try {
     writeFileSync(join(box.binDir, 'magpie'), '#!/bin/sh\nexit 0\n')
     const deps = makeDeps()
-    const controller = createController({ platform: 'linux', binDir: box.binDir, stateDir: box.stateDir, deps })
+    const controller = createController({ platform: 'linux', binDir: box.binDir, stateDir: box.stateDir, deps, settings: { startMode: 'serve', proxyMode: 'off' } })
     controller.start()
     assert.deepEqual(deps.spawned[0].args, ['serve'])
     assert.equal(deps.spawned[0].opts.env.MAGPIE_WEB_KEY, undefined)
@@ -205,4 +205,19 @@ test('命令输出按行拆分：处理 \\r 进度条、去尾空白、限长', 
   assert.deepEqual(splitLogChunk('a\r\nb\rc\n\n  d  '), ['a', 'b', 'c', '  d'])
   assert.deepEqual(splitLogChunk('x'.repeat(500))[0].length, 400)
   assert.deepEqual(splitLogChunk(''), [])
+})
+
+test('默认启动方式是 web', () => {
+  const box = sandbox()
+  try {
+    writeFileSync(join(box.binDir, 'magpie'), '#!/bin/sh\nexit 0\n')
+    const deps = makeDeps()
+    const controller = createController({ platform: 'linux', binDir: box.binDir, stateDir: box.stateDir, deps })
+    assert.equal(controller.snapshot().settings.startMode, 'web')
+    controller.start()
+    assert.deepEqual(deps.spawned[0].args.slice(0, 1), ['web'])
+    controller.dispose()
+  } finally {
+    box.cleanup()
+  }
 })

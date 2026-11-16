@@ -116,11 +116,15 @@ test('onChange 只回 patch + refresh，并让字段显隐立刻变化', () => {
 test('复制网页地址只在网页版模式给，并带 key', () => {
   const { panel, dispose } = setup()
   try {
-    assert.match(panel.definition.actions.copyWeb().toast, /不是网页版/)
-    panel.definition.actions.save({}, { value: { values } })
+    // 默认就是网页版：可直接复制，且带 key
     const copied = panel.definition.actions.copyWeb()
-    assert.match(copied.copy, /^http:\/\/127\.0\.0\.1:4001\/\?k=k{20}$/)
+    assert.match(copied.copy, /^http:\/\/127\.0\.0\.1:3430(\/\?k=[A-Za-z0-9._~-]+)?$/)
+    panel.definition.actions.save({}, { value: { values } })
+    assert.match(panel.definition.actions.copyWeb().copy, /^http:\/\/127\.0\.0\.1:4001\/\?k=k{20}$/)
     assert.equal(panel.definition.actions.copyGateway().copy, 'http://127.0.0.1:4000')
+    // 切回仅网关后不再提供网页地址
+    panel.definition.actions.save({}, { value: { values: { ...values, 'data.form.startMode': 'serve' } } })
+    assert.match(panel.definition.actions.copyWeb().toast, /不是网页版/)
   } finally {
     dispose()
   }
@@ -133,7 +137,7 @@ test('每次进入页签都重新推一份最新数据（不依赖视图缓存�
     const first = []
     const off1 = panel.definition.data({}, data => first.push(data))
     off1()
-    assert.equal(first[0].form.startMode, 'serve')
+    assert.equal(first[0].form.startMode, 'web')
     panel.definition.actions.save({}, { value: { values } })
     const second = []
     const off2 = panel.definition.data({}, data => second.push(data))
@@ -145,4 +149,7 @@ test('每次进入页签都重新推一份最新数据（不依赖视图缓存�
     dispose()
   }
 })
+
+
+
 
