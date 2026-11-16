@@ -1,7 +1,8 @@
 {
   "name": "dsh-go-magpie",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Installs magpie inside DSH Go's built-in Ubuntu environment and keeps its gateway (or gateway plus web console) running, with a native settings panel.",
+  "license": "MIT",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -16,7 +17,8 @@
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "test": "node --test test/*.test.js"
@@ -28,6 +30,7 @@
   "keywords": [
     "dsh",
     "dsh-plugin",
+    "dsh-bundle",
     "dsh-go",
     "magpie",
     "gateway",
@@ -64,6 +67,3 @@
     }
   }
 }
-
-
-

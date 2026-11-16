@@ -107,4 +107,6 @@ node <dsh-go>/sdk/plugin-kit/bin/check.mjs . --load   # 原生清单 + 视图 + 
 
 `dshGo` 清单：v1，一个面板 `magpie`，位置 `session.tab` / `features` / `plugin`。面板视图 v2（页签 + 表单 + 按钮），App 不具备 v2 组件时退回 v1 只读摘要。
 
+## 许可
 
+MIT，见 [LICENSE](LICENSE)。
