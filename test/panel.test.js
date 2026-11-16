@@ -126,3 +126,23 @@ test('复制网页地址只在网页版模式给，并带 key', () => {
   }
 })
 
+
+test('每次进入页签都重新推一份最新数据（不依赖视图缓存）', () => {
+  const { panel, dispose } = setup()
+  try {
+    const first = []
+    const off1 = panel.definition.data({}, data => first.push(data))
+    off1()
+    assert.equal(first[0].form.startMode, 'serve')
+    panel.definition.actions.save({}, { value: { values } })
+    const second = []
+    const off2 = panel.definition.data({}, data => second.push(data))
+    off2()
+    assert.equal(second[0].form.startMode, 'web')
+    assert.equal(second[0].gatewayUrl, 'http://127.0.0.1:4000')
+    assert.equal(second[0].webUrlText, 'http://127.0.0.1:4001/?k=' + 'k'.repeat(20))
+  } finally {
+    dispose()
+  }
+})
+

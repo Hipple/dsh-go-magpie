@@ -42,13 +42,15 @@ test('仅网关模式不出现网页版地址和网页版设置项', () => {
   assert.equal(view.includes('127.0.0.1:3430'), false)
 })
 
-test('网页版模式出现 web 端口、key 与含 key 的地址', () => {
+test('网页版模式出现 web 端口、key 与复制项；地址由数据绑定给出', () => {
   const settings = { ...baseSettings, startMode: 'web', webPort: 3430, webKey: 'k'.repeat(20) }
-  const view = flat(buildView(state({ settings, webUrl: `http://127.0.0.1:3430/?k=${'k'.repeat(20)}`, mode: 'web' }), caps, settings))
+  const webUrl = `http://127.0.0.1:3430/?k=${'k'.repeat(20)}`
+  const view = flat(buildView(state({ settings, webUrl, mode: 'web' }), caps, settings))
   assert.ok(view.includes('data.form.webPort'))
   assert.ok(view.includes('data.form.webKey'))
   assert.ok(view.includes('copyWeb'))
-  assert.ok(view.includes(`/?k=${'k'.repeat(20)}`))
+  assert.ok(view.includes('data.webUrlText'))
+  assert.equal(panelData(state({ settings, webUrl, mode: 'web' }), settings).webUrlText, webUrl)
 })
 
 test('不用代理时不显示代理地址输入框；选了代理才显示', () => {
@@ -88,8 +90,8 @@ test('日志用 codeBlock（固定高度可滚动），缺这个组件时退回�
   assert.equal(block.code, 'a\nb\nc')
   const noBlockCaps = { ...caps, components: caps.components.filter(name => name !== 'codeBlock') }
   const noBlock = buildView(state({ logTail: 'a\nb\nc' }), noBlockCaps, baseSettings)
-  const textLike = noBlock.children[0].items[0].children.find(node => node.type === 'text')
-  assert.ok(textLike)
+  const textLike = noBlock.children[0].items[0].children.some(node => node.type === 'text' && node.text === 'a\nb\nc')
+  assert.equal(textLike, true)
   assert.equal(JSON.stringify(noBlock).includes('"type":"codeBlock"'), false)
 })
 
@@ -109,4 +111,6 @@ test('视图在预算内：面板 ≤ 120 节点 / 8 层 / 32 KiB', () => {
   assert.ok(depth <= 8, `depth=${depth}`)
   assert.ok(Buffer.byteLength(JSON.stringify(view), 'utf8') <= 32 * 1024)
 })
+
+
 
