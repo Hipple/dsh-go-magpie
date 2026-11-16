@@ -1,0 +1,46 @@
+name: Publish to npm
+
+# 走 npm Trusted Publishing（OIDC），不需要 NODE_AUTH_TOKEN：
+# 在 npmjs.com → 包 → Settings → Trusted Publisher 里配置
+#   Repository owner: Hipple
+#   Repository name: dsh-go-magpie
+#   Workflow filename: publish.yml
+#   Environment: 留空（本工作流不使用 environment）
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write # 发布证明（provenance）与 Trusted Publishing 必需
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: npm 版本（Trusted Publishing 需要 11.5.1+）
+        run: npm --version
+
+      - name: 测试
+        run: npm test
+
+      - name: 校验 tag 与 package.json 版本一致
+        run: |
+          PKG="$(node -p "require('./package.json').version")"
+          TAG="${GITHUB_REF_NAME#v}"
+          echo "package=$PKG tag=$TAG"
+          if [ "$PKG" != "$TAG" ]; then
+            echo "tag 与 package.json 版本不一致，拒绝发布" >&2
+            exit 1
+          fi
+
+      - name: 发布到 npm（Trusted Publishing + provenance）
+        run: npm publish --access public --provenance
