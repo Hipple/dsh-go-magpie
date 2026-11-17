@@ -22,7 +22,7 @@ dsh-go-magpie is a magpie installation and deployment plugin built for DSH Go. I
 
 - Detects and installs magpie automatically; installation steps and output appear in the panel in real time.
 - Starts the local gateway (`serve`), or the gateway plus web console (`web`), according to configuration.
-- Lets you view status, copy the gateway/web addresses, start, stop and install from the panel.
+- Provides status viewing, gateway/web address copying, and start, stop and install actions from the panel.
 - Starts with the engine, and cleans up processes it started when the plugin is uninstalled or the engine exits.
 
 ## Requirements
@@ -139,7 +139,7 @@ Data retention across events:
 | `root/.local/bin/magpie` | kept | kept | kept | removed | removed |
 | `root/.local/state/magpie` | kept | kept | kept | removed | removed |
 | `usr/local/bin/magpie` symlink | kept | kept | kept | removed | removed |
-| plugin `data/settings.json` | kept | kept | kept | kept if you keep plugins | removed |
+| plugin `data/settings.json` | kept | kept | kept | kept if plugins are retained | removed |
 
 An engine upgrade replaces only system directories such as `opt/dsh`, `opt/node`, `opt/dsh-go`, `etc/dsh-app`; `/root` and `/usr/local/bin/magpie` are not among them. A runtime reset keeps only a few items under `root/.dsh`, so magpie is removed and reinstalled on the next start.
 
