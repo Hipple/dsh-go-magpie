@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/dsh-go-magpie"><img alt="NPM v1.3.7" src="https://img.shields.io/badge/NPM-V1.3.7-6366F1?style=for-the-badge&labelColor=1E1B4B"></a>
+  <a href="https://www.npmjs.com/package/dsh-go-magpie"><img alt="NPM v1.4.0" src="https://img.shields.io/badge/NPM-V1.4.0-6366F1?style=for-the-badge&labelColor=1E1B4B"></a>
   <a href="LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/LICENSE-MIT-10B981?style=for-the-badge&labelColor=064E3B"></a>
   <a href="package.json"><img alt="Node 22+" src="https://img.shields.io/badge/NODE-22%2B-F59E0B?style=for-the-badge&labelColor=451A03"></a>
 </p>
@@ -22,7 +22,7 @@ dsh-go-magpie 是为 DSH Go 打造的 magpie 安装与部署插件。它在 DSH 
 
 - 自动检测并安装 magpie，安装过程与输出实时显示在面板中。
 - 按配置启动本地网关（`serve`），或网关加网页控制台（`web`）。
-- 在面板中查看状态、复制网关/网页地址、启动、停止与安装。
+- 在面板中查看状态、复制网关/网页地址，按状态启动/停止与安装/重装，并用 magpie 自带更新器更新网关。
 - 随引擎自动启动，并在插件卸载或引擎退出时清理自身启动的进程。
 
 ## 运行要求
@@ -64,7 +64,8 @@ dsh plugin --profile web remove dsh-go-magpie
 
 - 状态：未安装 / 正在安装 / 运行中（本插件启动或已在别处启动）/ 已安装未运行；同时显示版本与当前启动方式。
 - 地址：位于按钮上方，点击即可复制；`web` 模式下第二行为带 key 的网页版地址。
-- 操作按钮：启动、停止、查看状态、安装。当前可用的操作会高亮；点击不可用的操作仅返回提示。
+- 操作按钮：第一行为「启动网关 / 停止网关」（按运行状态切换）与「查看状态」；第二行为「安装网关 / 重装网关」（按安装状态切换）与「更新网关」。当前可用的操作会高亮；点击不可用的操作仅返回提示。
+- 更新网关：调用 magpie 自带的 `magpie update`，更新渠道与镜像沿用 magpie 自身的配置；完成后重启由本插件启动的网关，更新结果回显在日志区。
 - 查看状态：将 `magpie --version`、`magpie healthcheck`、端口与进程信息写入日志区。
 - 日志区显示本次引擎启动以来的记录；日志文件在每次引擎加载时清空。
 

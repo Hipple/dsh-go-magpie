@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/dsh-go-magpie"><img alt="NPM v1.3.7" src="https://img.shields.io/badge/NPM-V1.3.7-6366F1?style=for-the-badge&labelColor=1E1B4B"></a>
+  <a href="https://www.npmjs.com/package/dsh-go-magpie"><img alt="NPM v1.4.0" src="https://img.shields.io/badge/NPM-V1.4.0-6366F1?style=for-the-badge&labelColor=1E1B4B"></a>
   <a href="LICENSE"><img alt="License MIT" src="https://img.shields.io/badge/LICENSE-MIT-10B981?style=for-the-badge&labelColor=064E3B"></a>
   <a href="package.json"><img alt="Node 22+" src="https://img.shields.io/badge/NODE-22%2B-F59E0B?style=for-the-badge&labelColor=451A03"></a>
 </p>
@@ -22,7 +22,7 @@ dsh-go-magpie is a magpie installation and deployment plugin built for DSH Go. I
 
 - Detects and installs magpie automatically; installation steps and output appear in the panel in real time.
 - Starts the local gateway (`serve`), or the gateway plus web console (`web`), according to configuration.
-- Provides status viewing, gateway/web address copying, and start, stop and install actions from the panel.
+- Provides status viewing, gateway/web address copying, state-driven start/stop and install/reinstall actions, and gateway updates through magpie's own updater.
 - Starts with the engine, and cleans up processes it started when the plugin is uninstalled or the engine exits.
 
 ## Requirements
@@ -64,7 +64,8 @@ The panel has two tabs: "Gateway" and "Settings".
 
 - Status: not installed / installing / running (started by this plugin or elsewhere) / installed but not running; version and current start mode are shown as well.
 - Addresses: above the buttons, click to copy. In `web` mode the second line is the web address including its key.
-- Actions: start, stop, check status, install. The action currently available is highlighted; clicking an unavailable one only returns a hint.
+- Actions: the first row is "Start gateway / Stop gateway" (switches with the running state) and "Show status"; the second row is "Install gateway / Reinstall gateway" (switches with the install state) and "Update gateway". The action currently available is highlighted; clicking an unavailable one only returns a hint.
+- Update gateway: runs magpie's own `magpie update`, so the update channel and mirror come from magpie's configuration; when it finishes, the gateway started by this plugin is restarted and the result is echoed in the log area.
 - Check status: writes `magpie --version`, `magpie healthcheck`, port and process details into the log area.
 - The log area shows records since the current engine start; the log file is cleared on each engine load.
 

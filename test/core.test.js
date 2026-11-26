@@ -12,12 +12,23 @@ function makeDeps(logText = '') {
     run: () => ({ ok: true, status: 0, error: '', output: 'magpie 1.2.3' }),
     runAsync: async () => ({ ok: true, status: 0, error: '', output: '' }),
     spawn: (bin, args, opts) => {
-      const child = { pid: 4242, killed: false, kill() { this.killed = true }, on() {}, once() {} }
+      const child = {
+        pid: 4242, killed: false,
+        kill() { this.killed = true; setTimeout(() => this.emitExit?.(0), 0) },
+        on() {}, once() {},
+      }
       spawned.push({ bin, args, opts, child })
       return child
     },
     probe: async () => false,
-    exit: (child, cb) => { child.emitExit = cb },
+    exit: (child, cb) => {
+      child.exitCallbacks = child.exitCallbacks ?? []
+      child.exitCallbacks.push(cb)
+      child.emitExit = code => {
+        const callbacks = child.exitCallbacks.splice(0)
+        for (const callback of callbacks) callback(code)
+      }
+    },
     readLog: () => logText,
   }
 }
@@ -205,6 +216,59 @@ test('命令输出按行拆分：处理 \\r 进度条、去尾空白、限长', 
   assert.deepEqual(splitLogChunk('a\r\nb\rc\n\n  d  '), ['a', 'b', 'c', '  d'])
   assert.deepEqual(splitLogChunk('x'.repeat(500))[0].length, 400)
   assert.deepEqual(splitLogChunk(''), [])
+})
+
+test('更新网关：调用 magpie update，版本变化后重启自己启动的进程', async () => {
+  const box = sandbox()
+  try {
+    writeFileSync(join(box.binDir, 'magpie'), '#!/bin/sh\nexit 0\n')
+    let current = 'magpie 1.2.3'
+    const updateCalls = []
+    const deps = makeDeps()
+    deps.run = () => ({ ok: true, status: 0, error: '', output: current })
+    deps.runAsync = async (cmd, args) => {
+      updateCalls.push({ cmd, args })
+      current = 'magpie 1.2.4'
+      return { ok: true, status: 0, error: '', output: 'updated' }
+    }
+    const controller = createController({ platform: 'linux', binDir: box.binDir, stateDir: box.stateDir, deps, settings: { startMode: 'serve', proxyMode: 'off' } })
+    assert.equal(controller.start().ok, true)
+    const result = await controller.update()
+    assert.equal(result.ok, true)
+    assert.equal(result.updated, true)
+    assert.equal(result.version, 'magpie 1.2.4')
+    assert.equal(result.restarted, true)
+    assert.deepEqual(updateCalls.map(call => call.args), [['update', '--addr', '127.0.0.1:1']])
+    assert.equal(deps.spawned.length, 2)
+    assert.deepEqual(deps.spawned[1].args, ['serve'])
+    assert.equal(controller.snapshot().version, 'magpie 1.2.4')
+    assert.match(controller.snapshot().logTail, /已更新/)
+    controller.dispose()
+  } finally {
+    box.cleanup()
+  }
+})
+
+test('更新网关：版本号没变就返回 updated=false，不重启（忽略 --version 输出格式变化）', async () => {
+  const box = sandbox()
+  try {
+    writeFileSync(join(box.binDir, 'magpie'), '#!/bin/sh\nexit 0\n')
+    let current = 'magpie 1.2.3'
+    const deps = makeDeps()
+    deps.run = () => ({ ok: true, status: 0, error: '', output: current })
+    deps.runAsync = async () => {
+      current = 'magpie v1.2.3 (build 42)'
+      return { ok: true, status: 0, error: '', output: 'already latest' }
+    }
+    const controller = createController({ platform: 'linux', binDir: box.binDir, stateDir: box.stateDir, deps, settings: { startMode: 'serve', proxyMode: 'off' } })
+    const result = await controller.update()
+    assert.equal(result.ok, true)
+    assert.equal(result.updated, false)
+    assert.equal(controller.snapshot().version, 'magpie v1.2.3 (build 42)')
+    controller.dispose()
+  } finally {
+    box.cleanup()
+  }
 })
 
 test('默认启动方式是 web', () => {

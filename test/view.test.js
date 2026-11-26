@@ -82,6 +82,23 @@ test('面板数据带完整表单草稿', () => {
   assert.deepEqual(Object.keys(data.form).sort(), ['autoStart', 'gatewayPort', 'proxy', 'proxyMode', 'startMode', 'webKey', 'webPort'])
 })
 
+test('按钮文案按运行与安装状态切换', () => {
+  const running = panelData(state({ running: true, installed: true, canStop: true }), baseSettings)
+  assert.equal(running.startStopLabelZh, '停止网关')
+  assert.equal(running.installLabelZh, '重装网关')
+  assert.equal(running.updateLabelZh, '更新网关')
+  const external = panelData(state({ running: true, installed: true, canStop: false, owned: false }), baseSettings)
+  assert.equal(external.startStopLabelZh, '网关运行中')
+  const stopped = panelData(state({ running: false, installed: true }), baseSettings)
+  assert.equal(stopped.startStopLabelZh, '启动网关')
+  const fresh = panelData(state({ running: false, installed: false }), baseSettings)
+  assert.equal(fresh.installLabelZh, '安装网关')
+  assert.equal(fresh.startStopLabelZh, '启动网关')
+  const busy = panelData(state({ updating: true }), baseSettings)
+  assert.equal(busy.updateLabelZh, '更新中…')
+})
+
+
 test('日志用 codeBlock（固定高度可滚动），缺这个组件时退回纯文本', () => {
   const withBlock = buildView(state({ logTail: 'a\nb\nc' }), caps, baseSettings)
   const gateway = withBlock.children[0].items[0].children
@@ -123,17 +140,19 @@ test('网关页结构：一份链接、两行按钮、按状态高亮', () => {
   const keyValueText = JSON.stringify(kids[0])
   assert.equal(keyValueText.includes('data.gatewayUrl'), false)
   assert.ok(JSON.stringify(kids[1]).includes('data.gatewayUrl'))
-  // 第一行：启动 · 停止；停止不可用时启动是 primary
-  assert.deepEqual(kids[3].items.map(item => item.action), ['start', 'stop'])
+  // 第一行：启动/停止 · 查看状态；可启停时第一个是 primary
+  assert.deepEqual(kids[3].items.map(item => item.action), ['toggle', 'status'])
+  assert.equal(kids[3].items[0].label.$, 'data.startStopLabelZh')
   assert.equal(kids[3].items[0].style, 'primary')
   assert.equal(kids[3].items[1].style, undefined)
-  // 第二行：查看状态 · 安装
-  assert.deepEqual(kids[4].items.map(item => item.action), ['status', 'install'])
+  // 第二行：安装/重装 · 更新
+  assert.deepEqual(kids[4].items.map(item => item.action), ['install', 'update'])
+  assert.equal(kids[4].items[1].label.$, 'data.updateLabelZh')
 
   const running = buildView(state({ canStart: false, canStop: true, running: true, owned: true }), caps, baseSettings)
   const runningActions = running.children[0].items[0].children[3]
-  assert.equal(runningActions.items[0].style, undefined)
-  assert.equal(runningActions.items[1].style, 'primary')
+  assert.equal(runningActions.items[0].style, 'primary')
+  assert.equal(runningActions.items[1].style, undefined)
 })
 
 test('网页版没设固定 key 时提示重启后重新复制', () => {

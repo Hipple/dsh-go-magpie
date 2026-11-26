@@ -179,6 +179,21 @@ test('启停动作在不可用时只回提示', () => {
     assert.match(start.toast, /还没装好|正在安装|已经在运行/)
     const stop = panel.definition.actions.stop({}, {})
     assert.match(stop.toast, /没有由本插件启动/)
+    const toggle = panel.definition.actions.toggle({}, {})
+    assert.equal(Array.isArray(toggle), false)
+    assert.match(toggle.toast, /还没装好|正在安装|已经在运行/)
+  } finally {
+    dispose()
+  }
+})
+
+test('更新动作已注册；未安装或非 Linux 时只回提示', () => {
+  const { panel, dispose } = setup()
+  try {
+    assert.equal(typeof panel.definition.actions.update, 'function')
+    const update = panel.definition.actions.update({}, {})
+    assert.equal(Array.isArray(update), false)
+    assert.match(update.toast, /仅支持 Linux 主机|还没装好/)
   } finally {
     dispose()
   }
